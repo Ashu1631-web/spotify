@@ -17,7 +17,7 @@ st.set_page_config(
 # -------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_csv("spotify.csv")  # Your dataset file
+    df = pd.read_excel("spotify.xls")  # Your dataset file
     return df
 
 df = load_data()
