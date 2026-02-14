@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # -------------------------------
@@ -11,103 +9,77 @@ import os
 @st.cache_data
 def load_data():
     file_path = os.path.join(os.path.dirname(__file__), "spotify.csv")
-    return pd.read_csv(file_path)
+    df = pd.read_csv(file_path)
+    return df
 
 df = load_data()
 
-# -------------------------------
-# Show Columns (Debug)
-# -------------------------------
-st.write("✅ Columns Found:", df.columns.tolist())
+# Rename first column as User
+df.rename(columns={"Unnamed: 0": "user"}, inplace=True)
+
+st.set_page_config(page_title="Spotify User Recommendation", layout="wide")
 
 # -------------------------------
-# Auto Detect Columns
+# Title
 # -------------------------------
-def find_column(possible_names):
-    for col in df.columns:
-        if col.lower().strip() in possible_names:
-            return col
-    return None
-
-song_col = find_column(["song", "song_1", "track", "track_name", "title"])
-artist_col = find_column(["artist", "artists", "user", "user_1", "singer"])
-genre_col = find_column(["genre", "genre_1", "category", "type"])
-
-# -------------------------------
-# Check Required Columns
-# -------------------------------
-if song_col is None or artist_col is None or genre_col is None:
-    st.error("❌ Dataset columns not matching!")
-    st.info("Please rename columns like: song, artist, genre")
-    st.stop()
-
-# Rename to standard
-df = df.rename(columns={
-    song_col: "song",
-    artist_col: "artist",
-    genre_col: "genre"
-})
-
-# -------------------------------
-# Page Config
-# -------------------------------
-st.set_page_config(page_title="Spotify Dashboard", layout="wide")
-
-st.title("🎧 Spotify Recommendation Dashboard")
+st.title("🎧 Spotify User-Based Recommendation Dashboard")
 
 # -------------------------------
 # KPI Cards
 # -------------------------------
-st.subheader("📌 KPI Overview")
+col1, col2, col3 = st.columns(3)
 
-c1, c2, c3 = st.columns(3)
-
-c1.metric("🎵 Total Songs", df["song"].nunique())
-c2.metric("👤 Total Users/Artists", df["artist"].nunique())
-c3.metric("🎼 Total Genres", df["genre"].nunique())
+col1.metric("👤 Total Users", df["user"].nunique())
+col2.metric("🎵 Total Songs", df.shape[1] - 1)
+col3.metric("📊 Total Records", df.shape[0])
 
 st.markdown("---")
 
 # -------------------------------
-# Top Artists Graph
+# Top Listening Songs (Overall)
 # -------------------------------
-st.subheader("📊 Top Listening Users/Artists")
+st.subheader("🔥 Top 10 Most Played Songs Overall")
 
-top_artists = df["artist"].value_counts().head(10)
+song_columns = df.columns[1:]  # all song columns
+
+top_songs = df[song_columns].sum().sort_values(ascending=False).head(10)
 
 fig = plt.figure()
-plt.bar(top_artists.index, top_artists.values)
+plt.bar(top_songs.index, top_songs.values)
 plt.xticks(rotation=45)
+plt.xlabel("Songs")
+plt.ylabel("Total Plays")
+
 st.pyplot(fig)
 
 st.markdown("---")
 
 # -------------------------------
-# Recommendation Engine
+# User Recommendation System
 # -------------------------------
-st.subheader("🤖 Recommendation System")
+st.subheader("🤖 Recommend Songs for a User")
 
-df["tags"] = df["artist"].astype(str) + " " + df["genre"].astype(str)
+# Select User
+user_list = df["user"].unique()
+selected_user = st.selectbox("Select User:", user_list)
 
-cv = CountVectorizer(max_features=5000)
-vectors = cv.fit_transform(df["tags"]).toarray()
+# Recommend Function
+def recommend_songs(user_name, n=5):
+    user_row = df[df["user"] == user_name]
 
-similarity = cosine_similarity(vectors)
+    # Get listening history
+    listens = user_row[song_columns].T
+    listens.columns = ["plays"]
 
-def recommend(song_name):
-    index = df[df["song"] == song_name].index[0]
-    distances = sorted(list(enumerate(similarity[index])),
-                       reverse=True,
-                       key=lambda x: x[1])
+    # Recommend most played songs by that user
+    top_user_songs = listens.sort_values(by="plays", ascending=False).head(n)
 
-    rec = []
-    for i in distances[1:6]:
-        rec.append(df.iloc[i[0]]["song"])
-    return rec
+    return top_user_songs
 
-selected_song = st.selectbox("🎵 Select Song:", df["song"].unique())
+if st.button("Recommend Songs"):
+    st.subheader(f"🎶 Top Recommendations for {selected_user}")
 
-if st.button("Recommend"):
-    st.subheader("✅ Recommended Songs:")
-    for s in recommend(selected_song):
-        st.write("🎧", s)
+    rec = recommend_songs(selected_user)
+
+    for song, row in rec.iterrows():
+        st.write(f"✅ {song}  → Plays: {row['plays']}")
