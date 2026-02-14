@@ -1,30 +1,67 @@
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import os
 
 # -------------------------------
-# Page Configuration
-# -------------------------------
-st.set_page_config(
-    page_title="Music Recommendation Dashboard",
-    page_icon="🎧",
-    layout="wide"
-)
-
-# -------------------------------
-# Load Dataset
+# Load Excel Dataset
 # -------------------------------
 @st.cache_data
 def load_data():
-    df = pd.read_excel("spotify.xls")  # Your dataset file
+    file_path = os.path.join(os.path.dirname(__file__), "spotify.xlsx")
+    df = pd.read_excel(file_path)   # Excel File Load
     return df
 
 df = load_data()
 
+st.set_page_config(page_title="Spotify Recommendation Dashboard", layout="wide")
+
 # -------------------------------
-# Feature Engineering
+# Title
 # -------------------------------
+st.title("🎧 Spotify Recommendation Dashboard")
+
+# -------------------------------
+# KPI SECTION
+# -------------------------------
+col1, col2, col3, col4 = st.columns(4)
+
+col1.metric("🎵 Total Songs", df["song"].nunique())
+col2.metric("🎤 Total Artists", df["artist"].nunique())
+col3.metric("🎼 Total Genres", df["genre"].nunique())
+
+if "popularity" in df.columns:
+    col4.metric("⭐ Avg Popularity", round(df["popularity"].mean(), 2))
+else:
+    col4.metric("⭐ Popularity", "Not Available")
+
+st.markdown("---")
+
+# -------------------------------
+# TOP LISTENING GRAPH
+# -------------------------------
+st.subheader("📊 Top 10 Artists (Most Songs)")
+
+top_artists = df["artist"].value_counts().head(10)
+
+fig = plt.figure()
+plt.bar(top_artists.index, top_artists.values)
+plt.xticks(rotation=45)
+plt.xlabel("Artist")
+plt.ylabel("Number of Songs")
+
+st.pyplot(fig)
+
+st.markdown("---")
+
+# -------------------------------
+# Recommendation Engine
+# -------------------------------
+st.subheader("🎶 Music Recommendation System")
+
+# Combine Features
 df["tags"] = df["artist"] + " " + df["genre"]
 
 # Vectorization
@@ -34,106 +71,29 @@ vectors = cv.fit_transform(df["tags"]).toarray()
 # Similarity Matrix
 similarity = cosine_similarity(vectors)
 
-# -------------------------------
-# Recommendation Function
-# -------------------------------
+# Recommend Function
 def recommend(song_name):
     if song_name not in df["song"].values:
-        return []
+        return ["❌ Song not found in dataset"]
 
     index = df[df["song"] == song_name].index[0]
-    distances = sorted(
-        list(enumerate(similarity[index])),
-        reverse=True,
-        key=lambda x: x[1]
-    )
+    distances = sorted(list(enumerate(similarity[index])),
+                       reverse=True,
+                       key=lambda x: x[1])
 
     recommendations = []
     for i in distances[1:6]:
-        recommendations.append(df.iloc[i[0]])
+        recommendations.append(df.iloc[i[0]]["song"])
 
     return recommendations
 
-
-# -------------------------------
-# Sidebar UI
-# -------------------------------
-st.sidebar.title("🎵 Dashboard Controls")
-st.sidebar.write("Select a song and get recommendations instantly!")
-
+# Dropdown UI
 song_list = df["song"].values
-selected_song = st.sidebar.selectbox("🎧 Choose a Song", song_list)
+selected_song = st.selectbox("Select a Song:", song_list)
 
-st.sidebar.markdown("---")
-st.sidebar.info("💡 Tip: Select any song to discover similar tracks!")
-
-# -------------------------------
-# Main Dashboard UI
-# -------------------------------
-st.title("🎧 Music Recommendation Engine")
-st.markdown(
-    """
-    <h4 style='color:gray;'>
-    Discover songs similar to your favorite tracks with AI-powered recommendations.
-    </h4>
-    """,
-    unsafe_allow_html=True
-)
-
-st.markdown("---")
-
-# Display Selected Song Details
-song_data = df[df["song"] == selected_song].iloc[0]
-
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.metric("🎵 Song", song_data["song"])
-
-with col2:
-    st.metric("🎤 Artist", song_data["artist"])
-
-with col3:
-    st.metric("🎼 Genre", song_data["genre"])
-
-st.markdown("---")
-
-# Recommendation Button
-if st.sidebar.button("🚀 Recommend Songs"):
-
-    st.subheader("✨ Recommended Songs For You")
+if st.button("Recommend Songs"):
+    st.subheader("✅ Recommended Songs For You:")
 
     results = recommend(selected_song)
-
-    if results:
-
-        cols = st.columns(5)
-
-        for idx, song in enumerate(results):
-            with cols[idx]:
-                st.markdown(
-                    f"""
-                    <div style="
-                        background-color:#1e1e1e;
-                        padding:15px;
-                        border-radius:15px;
-                        text-align:center;
-                        box-shadow: 0px 0px 10px rgba(0,0,0,0.3);
-                    ">
-                        <h4 style="color:white;">🎵 {song['song']}</h4>
-                        <p style="color:lightgray;">🎤 {song['artist']}</p>
-                        <p style="color:skyblue;">🎼 {song['genre']}</p>
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
-
-    else:
-        st.error("❌ Song not found in dataset!")
-
-# Footer
-st.markdown("---")
-st.markdown(
-    "<center>🚀 Built with Streamlit | Music Recommendation Dashboard</center>",
-    unsafe_allow_html=True
-)
+    for song in results:
+        st.write("🎵", song)
