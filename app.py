@@ -14,72 +14,82 @@ def load_data():
 
 df = load_data()
 
-# Rename first column as User
+# Rename first column
 df.rename(columns={"Unnamed: 0": "user"}, inplace=True)
 
-st.set_page_config(page_title="Spotify User Recommendation", layout="wide")
+song_columns = df.columns[1:]  # all song columns
+
+st.set_page_config(page_title="Spotify Dashboard", layout="wide")
 
 # -------------------------------
 # Title
 # -------------------------------
-st.title("🎧 Spotify User-Based Recommendation Dashboard")
+st.title("🎧 Spotify User Listening Dashboard")
 
 # -------------------------------
-# KPI Cards
+# Select User
 # -------------------------------
+user_list = df["user"].unique()
+selected_user = st.selectbox("👤 Select User:", user_list)
+
+# Filter user row
+user_row = df[df["user"] == selected_user]
+
+# -------------------------------
+# Dynamic KPI Cards
+# -------------------------------
+st.subheader("📌 User Listening KPIs")
+
+total_songs_listened = (user_row[song_columns] > 0).sum(axis=1).values[0]
+total_plays = user_row[song_columns].sum(axis=1).values[0]
+most_played_song = user_row[song_columns].T.sort_values(by=user_row.index[0], ascending=False).index[0]
+
 col1, col2, col3 = st.columns(3)
 
-col1.metric("👤 Total Users", df["user"].nunique())
-col2.metric("🎵 Total Songs", df.shape[1] - 1)
-col3.metric("📊 Total Records", df.shape[0])
+col1.metric("🎵 Songs Listened", total_songs_listened)
+col2.metric("▶ Total Plays", int(total_plays))
+col3.metric("🔥 Most Played Song", most_played_song)
 
 st.markdown("---")
 
 # -------------------------------
-# Top Listening Songs (Overall)
+# Dynamic Top Songs Graph (User Based)
 # -------------------------------
-st.subheader("🔥 Top 10 Most Played Songs Overall")
+st.subheader(f"📊 Top 10 Songs Played by {selected_user}")
 
-song_columns = df.columns[1:]  # all song columns
+user_song_counts = user_row[song_columns].T
+user_song_counts.columns = ["plays"]
 
-top_songs = df[song_columns].sum().sort_values(ascending=False).head(10)
+top_user_songs = user_song_counts.sort_values(by="plays", ascending=False).head(10)
 
 fig = plt.figure()
-plt.bar(top_songs.index, top_songs.values)
+plt.bar(top_user_songs.index, top_user_songs["plays"])
 plt.xticks(rotation=45)
 plt.xlabel("Songs")
-plt.ylabel("Total Plays")
+plt.ylabel("Plays")
 
 st.pyplot(fig)
 
 st.markdown("---")
 
 # -------------------------------
-# User Recommendation System
+# Recommendation System
 # -------------------------------
-st.subheader("🤖 Recommend Songs for a User")
+st.subheader("🤖 Recommended Songs (Based on User Listening)")
 
-# Select User
-user_list = df["user"].unique()
-selected_user = st.selectbox("Select User:", user_list)
-
-# Recommend Function
 def recommend_songs(user_name, n=5):
-    user_row = df[df["user"] == user_name]
-
-    # Get listening history
-    listens = user_row[song_columns].T
+    user_data = df[df["user"] == user_name]
+    listens = user_data[song_columns].T
     listens.columns = ["plays"]
 
-    # Recommend most played songs by that user
-    top_user_songs = listens.sort_values(by="plays", ascending=False).head(n)
+    # Recommend Top Played Songs
+    recommendations = listens.sort_values(by="plays", ascending=False).head(n)
+    return recommendations
 
-    return top_user_songs
-
-if st.button("Recommend Songs"):
-    st.subheader(f"🎶 Top Recommendations for {selected_user}")
-
+if st.button("Show Recommendations"):
     rec = recommend_songs(selected_user)
 
+    st.subheader("✅ Recommended Songs For You:")
+
     for song, row in rec.iterrows():
-        st.write(f"✅ {song}  → Plays: {row['plays']}")
+        st.write(f"🎶 {song} → Plays: {row['plays']}")
