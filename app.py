@@ -6,17 +6,17 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # -------------------------------
-# Load XLS Dataset Correctly
+# Load CSV Dataset
 # -------------------------------
 @st.cache_data
 def load_data():
-    file_path = os.path.join(os.path.dirname(__file__), "spotify.xls")
-    df = pd.read_excel(file_path, engine="xlrd")  # ✅ FIX for .xls
+    file_path = os.path.join(os.path.dirname(__file__), "spotify.csv")
+    df = pd.read_csv(file_path)
     return df
 
 df = load_data()
 
-st.set_page_config(page_title="Spotify Recommendation Dashboard", layout="wide")
+st.set_page_config(page_title="Spotify Dashboard", layout="wide")
 
 # -------------------------------
 # Title
@@ -69,9 +69,6 @@ vectors = cv.fit_transform(df["tags"]).toarray()
 similarity = cosine_similarity(vectors)
 
 def recommend(song_name):
-    if song_name not in df["song"].values:
-        return ["❌ Song not found in dataset"]
-
     index = df[df["song"] == song_name].index[0]
     distances = sorted(list(enumerate(similarity[index])),
                        reverse=True,
