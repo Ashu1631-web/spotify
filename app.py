@@ -6,12 +6,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 import os
 
 # -------------------------------
-# Load Excel Dataset
+# Load XLS Dataset Correctly
 # -------------------------------
 @st.cache_data
 def load_data():
-    file_path = os.path.join(os.path.dirname(__file__), "spotify.xlsx")
-    df = pd.read_excel(file_path)   # Excel File Load
+    file_path = os.path.join(os.path.dirname(__file__), "spotify.xls")
+    df = pd.read_excel(file_path, engine="xlrd")  # ✅ FIX for .xls
     return df
 
 df = load_data()
@@ -24,7 +24,7 @@ st.set_page_config(page_title="Spotify Recommendation Dashboard", layout="wide")
 st.title("🎧 Spotify Recommendation Dashboard")
 
 # -------------------------------
-# KPI SECTION
+# KPI Cards
 # -------------------------------
 col1, col2, col3, col4 = st.columns(4)
 
@@ -40,7 +40,7 @@ else:
 st.markdown("---")
 
 # -------------------------------
-# TOP LISTENING GRAPH
+# Top Artists Graph
 # -------------------------------
 st.subheader("📊 Top 10 Artists (Most Songs)")
 
@@ -61,17 +61,13 @@ st.markdown("---")
 # -------------------------------
 st.subheader("🎶 Music Recommendation System")
 
-# Combine Features
 df["tags"] = df["artist"] + " " + df["genre"]
 
-# Vectorization
 cv = CountVectorizer(max_features=5000)
 vectors = cv.fit_transform(df["tags"]).toarray()
 
-# Similarity Matrix
 similarity = cosine_similarity(vectors)
 
-# Recommend Function
 def recommend(song_name):
     if song_name not in df["song"].values:
         return ["❌ Song not found in dataset"]
@@ -87,7 +83,6 @@ def recommend(song_name):
 
     return recommendations
 
-# Dropdown UI
 song_list = df["song"].values
 selected_song = st.selectbox("Select a Song:", song_list)
 
